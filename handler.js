@@ -1,235 +1,1159 @@
-import db from "#db"
-import ws from 'ws';
+import db from '#db';
 import moment from 'moment';
 import chalk from 'chalk';
 import fs from 'fs';
 import path from 'path';
-import gradient from 'gradient-string';
+import { fileURLToPath } from 'url';
 import { getCachedMeta, setCachedMeta } from '#serialize';
 
-export default async (furina, msg) => {
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-  if (msg.fromMe && !msg.key.participant && msg.isBot) return;  
-  const sender = msg.sender;
-  let body = msg.body || '';
+// ═══════════════════════════════════════
+// Furina — نظام الأوامر
+// ═══════════════════════════════════════
 
-const from = msg.key.remoteJid
-const botJid = furina.user.id.split(':')[0] + '@s.whatsapp.net' || furina.user.lid
+if (!(global.comandos instanceof Map)) {
+  global.comandos = new Map();
+}
 
-const chatData = await db.getChat(msg.chat)
-const settings = await db.getSettings(botJid)  
+if (!(global.cmdsExecute instanceof Array)) {
+  global.cmdsExecute = [];
+}
 
-  const isOwner = global.owner.map(num => num + '@s.whatsapp.net').includes(sender);
-  const isROwner = [botJid, ...(settings.owner ? [settings.owner] : []), ...global.owner.map(num => num + '@s.whatsapp.net')].includes(sender);
+if (!(global.plugins instanceof Object)) {
+  global.plugins = {};
+}
 
-  let groupMetadata = null;
-  let groupName = '';
-  if (msg.isGroup) {
-    groupMetadata = getCachedMeta(msg.chat);
-    if (!groupMetadata) {
-      groupMetadata = await furina.groupMetadata(msg.chat).catch(() => null);
-      if (groupMetadata) setCachedMeta(msg.chat, groupMetadata);
-    }
-    groupName = groupMetadata?.subject || '';
+if (!Array.isArray(global.owner)) {
+  global.owner = [];
+}
+
+if (!Array.isArray(global.mods)) {
+  global.mods = [];
+}
+
+const commandsPath = path.join(__dirname, 'cmds');
+
+
+// ═══════════════════════════════════════
+// أدوات مساعدة
+// ═══════════════════════════════════════
+
+function normalizeNumber(number) {
+  return String(number || '')
+    .replace(/[^0-9]/g, '');
+}
+
+function toJid(number) {
+  const clean = normalizeNumber(number);
+
+  if (!clean) return '';
+
+  return `${clean}@s.whatsapp.net`;
+}
+
+function getOwnerJids() {
+  return global.owner
+    .map(toJid)
+    .filter(Boolean);
+}
+
+function getModsJids() {
+  return global.mods
+    .map(toJid)
+    .filter(Boolean);
+}
+
+function escapeRegex(text) {
+  return String(text)
+    .replace(/[|\\{}()[\]^$+*?.]/g, '\\$&');
+}
+
+function getSenderJid(msg) {
+  return (
+    msg?.sender ||
+    msg?.key?.participant ||
+    msg?.participant ||
+    ''
+  );
+}
+
+function getBotJid(furina) {
+  return (
+    furina?.user?.id?.split(':')[0] ||
+    furina?.user?.lid?.split(':')[0] ||
+    ''
+  );
+}
+
+function isAdminParticipant(participant, jid) {
+  if (!participant || !jid) return false;
+
+  const target = jid.split('@')[0];
+
+  const ids = [
+    participant.id,
+    participant.lid,
+    participant.phoneNumber
+  ]
+    .filter(Boolean)
+    .map(x => String(x).split('@')[0]);
+
+  return (
+    ids.includes(target) &&
+    (
+      participant.admin === 'admin' ||
+      participant.admin === 'superadmin'
+    )
+  );
+}
+
+
+// ═══════════════════════════════════════
+// تحميل بيانات المجموعة
+// ═══════════════════════════════════════
+
+async function getGroupData(furina, msg) {
+  if (!msg?.isGroup) {
+    return {
+      groupMetadata: null,
+      participants: [],
+      isAdmins: false,
+      isBotAdmins: false
+    };
   }
-  const participants = groupMetadata?.participants || [];
-  const adminSet = new Set(participants.filter(p => p.admin === 'admin' || p.admin === 'superadmin').flatMap(p => [p.id?.split('@')[0], p.lid?.split('@')[0], p.phoneNumber?.split('@')[0]].filter(Boolean)));
-  const senderBase = sender.split('@')[0];
-  const botBase = botJid.split('@')[0];
-  const isBotAdmins = msg.isGroup ? adminSet.has(botBase) : false;
-  const isAdmins = msg.isGroup ? adminSet.has(senderBase) : false;
 
-  Promise.allSettled((global.cmdsExecute ?? []).filter(p => p.type === 'all').map(p => p.fn({ msg, furina, groupMetadata, participants, isAdmins, isBotAdmins, isOwner, __dirname: p.dirname }).catch(e => console.error(chalk.gray(`[ ✿ ] خطأ في إضافة all-plugin ${p.key}: ${e.message}`)))));
+  let groupMetadata = getCachedMeta(msg.chat);
 
-const tf = await db.getChatUser(msg.chat, msg.sender)
-const to = new Date().toLocaleDateString('ar-EG', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit' }).split('/').reverse().join('-') 
-if (!tf.stats) tf.stats = {}
-if (!tf.stats[to]) tf.stats[to] = { msgs: 0, cmds: 0 }
-tf.stats[to].msgs++
-
-await db.updateChatUser(msg.chat, msg.sender, 'stats', tf.stats)
-
-  const rawBotname = settings.namebot2 || 'Stellar';
-  const tipo = settings.type || 'Sub';
-  const cleanBotname = rawBotname.replace(/[^a-zA-Z0-9\s]/g, '');
-  const namebot = cleanBotname || 'Stellar';
-  const shortForms = [namebot.charAt(0), namebot.split(" ")[0], tipo.split(" ")[0], namebot.split(" ")[0].slice(0, 2), namebot.split(" ")[0].slice(0, 3)];
-  const prefixes = shortForms.map(name => `${name}`);
-  prefixes.unshift(namebot);
-  let prefix;
-  if (Array.isArray(settings.prefijo) || typeof settings.prefijo === 'string') {
-    const prefixArray = Array.isArray(settings.prefijo) ? settings.prefijo : [settings.prefijo];
-    prefix = new RegExp('^(' + prefixes.join('|') + ')?(' + prefixArray.map(p => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')', 'i');
-  } else if (settings.prefijo === 1) {
-    prefix = new RegExp('^', 'i');
-  } else {
-    prefix = new RegExp('^(' + prefixes.join('|') + ')?', 'i');
-  }
-  const strRegex = (str) => str.replace(/[|\\{}()[\]^$+*?.]/g, '\\$&');
-  let customCmd = null;
-  let pluginPrefix = prefix;
-  for (const [cmdName, data] of global.comandos) {
-    if (!data.customPrefix) continue;
-    const cp = data.customPrefix;
-    const ms = cp instanceof RegExp ? [[cp.exec(msg.text), cp]] : Array.isArray(cp) ? cp.map(p => { let r = p instanceof RegExp ? p : new RegExp(strRegex(p)); return [r.exec(msg.text), r]; }) : typeof cp === 'string' ? [[new RegExp(strRegex(cp)).exec(msg.text), new RegExp(strRegex(cp))]] : [[null, null]];
-    if (ms.find(p => p[0])) { customCmd = cmdName; pluginPrefix = cp; break; }
-  }
-  let matchs = pluginPrefix instanceof RegExp ? [[pluginPrefix.exec(msg.text), pluginPrefix]] : Array.isArray(pluginPrefix) ? pluginPrefix.map(p => {
-    let regex = p instanceof RegExp ? p : new RegExp(strRegex(p));
-    return [regex.exec(msg.text), regex];
-  }) : typeof pluginPrefix === 'string' ? [[new RegExp(strRegex(pluginPrefix)).exec(msg.text), new RegExp(strRegex(pluginPrefix))]] : [[null, null]];
-  let match = matchs.find(p => p[0]) || null;
-
-  for (const p of (global.cmdsExecute ?? [])) {
-    if (p.type !== 'before') continue;
+  if (!groupMetadata) {
     try {
-      if (await p.fn({ msg, furina, match, groupMetadata, participants, isAdmins, isBotAdmins, isOwner, __dirname: p.dirname })) continue;
-    } catch (e) {
-      console.error(chalk.gray(`[ ✿ ] خطأ في before-plugin ${p.key}: ${e.message}`));
-    }
-  }
+      groupMetadata = await furina.groupMetadata(msg.chat);
 
-  if (!match) return;
-  let usedPrefix = (match[0] || [])[0] || '';
-  let args = msg.text.slice(usedPrefix.length).trim().split(" ");
-  let command = customCmd ?? (args.shift() || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  let text = args.join(' ');
-  if (!command) return;
-
-const pushname = msg.pushName || 'بدون اسم'
-
-const consolePrimary = chatData.primaryBot;
-
-if (msg.message || !consolePrimary || consolePrimary === botJid) {
-console.log(`
-𝄢 · • —– ٠ ✤ ٠ —– • · · • —– ٠ ✤ ٠ —– • ·✧༄
-❚ ▸ ${chalk.cyan('𝐁𝐎𝐓 ❱❱')} ${chalk.bgMagenta(chalk.white.italic(furina.user.name))}
-❚ ▸ ${chalk.cyan('𝐓𝐈𝐌𝐄 ❱❱')} ${chalk.black.bgWhite(moment().format('DD/MM/YY HH:mm:ss'))}
-❚ ${chalk.magentaBright('°o.OO.o°°o.OO.o°°o.OO.o°')}
-❚ ▸ ${chalk.green('𝐔𝐒𝐄𝐑 ❱❱')} ${chalk.white(pushname)} / ${chalk.bgMagentaBright.bold(msg.isGroup ? 'مجموعة' : 'محادثة خاصة')}
-❚ ▸ ${chalk.green('𝐂𝐎𝐌𝐌𝐀𝐍𝐃 ❱❱')} ${chalk.magentaBright(command ? command : 'لا يوجد أمر')}
-❚ ${chalk.magentaBright('°o.OO.o°°o.OO.o°°o.OO.o°')}
-❚ ▸ ${chalk.redBright('𝐓𝐘𝐏𝐄 ❱❱')} ${chalk.greenBright.bold('[سجل البوت]')}
-𝄢 · • —– ٠ ✤ ٠ —– • · · • —– ٠ ✤ ٠ —– • ·✧༄`.trim())
-}
-
-  const hasPrefix = settings.prefijo === 1 ? 1 : (Array.isArray(settings.prefijo) ? settings.prefijo : typeof settings.prefijo === 'string' ? [settings.prefijo] : []).some(p => msg.text?.startsWith(p));
-  const botprimaryId = chatData?.primaryBot;
-  if (botprimaryId && botprimaryId !== botJid) {
-    if (hasPrefix) {
-      const groupJids = participants.map(p => p.id);
-      const sessionDirs = ['./Sessions/Subs']
-      function getAllSessionBots() {
-        const bots = [];
-        for (const dir of sessionDirs) {
-          try {
-            for (const sub of fs.readdirSync(path.resolve(dir))) {
-              if (fs.existsSync(path.resolve(dir, sub, 'creds.json')))
-                bots.push(sub + '@s.whatsapp.net');
-            }
-          } catch {}
-        }
-        try {
-          if (fs.existsSync(path.resolve('./Sessions/Owner/creds.json'))) {
-            const ownerId = global.furina?.user?.id?.split(':')[0] + '@s.whatsapp.net';
-            if (ownerId) bots.push(ownerId);
-          }
-        } catch {}
-        return bots;
+      if (groupMetadata) {
+        setCachedMeta(msg.chat, groupMetadata);
       }
-      const sessionBots = getAllSessionBots();
-      const primaryInGroup = groupJids.includes(botprimaryId);
-      const isPrimarySelf = botprimaryId === botJid;
-      const primaryInSessions = sessionBots.includes(botprimaryId);
-      if (!primaryInSessions || !primaryInGroup) return;
-      if ((primaryInSessions && primaryInGroup) || isPrimarySelf) return;
+    } catch {
+      groupMetadata = null;
     }
   }
 
-const isVotOwn = [
-  furina.user.id.split(':')[0] + '@s.whatsapp.net',
-  ...global.owner.map(num => num + '@s.whatsapp.net')
-].includes(sender)
+  const participants = groupMetadata?.participants || [];
 
-if (settings.self) {
-  const owner = settings.owner
-  if (
-    sender !== owner &&
-    !isVotOwn &&
-    !global.mods.map(num => num + '@s.whatsapp.net').includes(sender)
-  ) return
+  const sender = getSenderJid(msg);
+  const botJid = getBotJid(furina);
+
+  const isAdmins = participants.some(
+    p => isAdminParticipant(p, sender)
+  );
+
+  const isBotAdmins = participants.some(
+    p => isAdminParticipant(p, botJid)
+  );
+
+  return {
+    groupMetadata,
+    participants,
+    isAdmins,
+    isBotAdmins
+  };
 }
 
-if (msg.chat && !msg.chat.endsWith('g.us')) {
-  const allowedInPrivateForUsers = ['report', 'reporte', 'sug', 'suggest', 'invite', 'invitar', 'setusername', 'setpfp', 'setimage', 'setstatus', 'reload', 'setname', 'setbotname', 'setmenubanner', 'setbanner', 'setbotcurrency', 'code', 'qr', 'setbotowner', 'setlink', 'setbotlink', 'setbotprefix', 'seticon']
-  const owners = settings.owner
-  if (
-    sender !== owners &&
-    !global.owner.map(num => num + '@s.whatsapp.net').includes(sender) &&
-    !allowedInPrivateForUsers.includes(command)
-  ) return
+
+// ═══════════════════════════════════════
+// البادئة Prefix
+// ═══════════════════════════════════════
+
+function createPrefix(settings) {
+  const rawBotname = settings?.namebot2 || 'Furina';
+  const type = settings?.type || 'Furina';
+
+  const cleanBotname =
+    String(rawBotname)
+      .replace(/[^a-zA-Z0-9\s]/g, '')
+      .trim();
+
+  const namebot = cleanBotname || 'Furina';
+
+  const shortForms = [
+    namebot.charAt(0),
+    namebot.split(' ')[0],
+    String(type).split(' ')[0],
+    namebot.split(' ')[0].slice(0, 2),
+    namebot.split(' ')[0].slice(0, 3)
+  ].filter(Boolean);
+
+  const prefixes = [
+    namebot,
+    ...shortForms
+  ];
+
+  if (Array.isArray(settings?.prefijo)) {
+    const list = settings.prefijo
+      .map(x => String(x))
+      .filter(Boolean);
+
+    if (!list.length) {
+      return new RegExp('^', 'i');
+    }
+
+    return new RegExp(
+      '^(' +
+      prefixes.map(escapeRegex).join('|') +
+      ')?(' +
+      list.map(escapeRegex).join('|') +
+      ')',
+      'i'
+    );
+  }
+
+  if (typeof settings?.prefijo === 'string') {
+    return new RegExp(
+      '^(' +
+      prefixes.map(escapeRegex).join('|') +
+      ')?(' +
+      escapeRegex(settings.prefijo) +
+      ')',
+      'i'
+    );
+  }
+
+  if (settings?.prefijo === 1) {
+    return /^/i;
+  }
+
+  return new RegExp(
+    '^(' +
+    prefixes.map(escapeRegex).join('|') +
+    ')?',
+    'i'
+  );
 }
 
-if (chatData?.bannedGrupo && !['#bot on', '/bot on', '.bot on', '!bot on', '-bot on', '+bot on', 'bot on'].includes(body.toLowerCase()) &&
-    !global.owner.map(num => num + '@s.whatsapp.net').includes(msg.sender)) return
 
-if (chatData.adminonly && !isAdmins) return
+// ═══════════════════════════════════════
+// Custom Prefix
+// ═══════════════════════════════════════
 
-if ((msg.id.startsWith("3EB0") || (msg.id.startsWith("BAE5") && msg.id.length === 16) || (msg.id.startsWith("B24E") && msg.id.length === 20))) return
+function findCustomPrefix(text) {
+  let customCmd = null;
+  let pluginPrefix = null;
 
-const user = await db.getChatUser(msg.chat, msg.sender)
+  for (const [cmdName, data] of global.comandos.entries()) {
 
-const today = new Date().toLocaleDateString('ar-EG', { 
-  timeZone: 'Africa/Cairo',
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit'
-}).split('/').reverse().join('-') 
+    if (!data?.customPrefix) continue;
 
-if (!user.stats) user.stats = {}
-if (!user.stats[today]) user.stats[today] = { msgs: 0, cmds: 0 }
+    const cp = data.customPrefix;
 
-  const cmdData = global.comandos.get(command);
+    let patterns = [];
 
-if (!cmdData) {
-  if (settings.prefijo === 1) return
-  await furina.readMessages([msg.key])
-  return msg.reply(`ꕤ الأمر *${command}* غير موجود.\n✎ استخدمي *${usedPrefix}help* لرؤية قائمة الأوامر المتاحة.`)
+    if (cp instanceof RegExp) {
+      patterns = [cp];
+
+    } else if (Array.isArray(cp)) {
+      patterns = cp.map(item =>
+        item instanceof RegExp
+          ? item
+          : new RegExp(escapeRegex(item), 'i')
+      );
+
+    } else if (typeof cp === 'string') {
+      patterns = [
+        new RegExp(escapeRegex(cp), 'i')
+      ];
+    }
+
+    for (const regex of patterns) {
+      if (regex.test(text)) {
+        customCmd = cmdName;
+        pluginPrefix = regex;
+        break;
+      }
+    }
+
+    if (customCmd) break;
+  }
+
+  return {
+    customCmd,
+    pluginPrefix
+  };
 }
 
-const comando = msg.text.slice(usedPrefix.length)
 
-if (cmdData.isOwner && !global.owner.map(num => num + '@s.whatsapp.net').includes(sender)) {
-  return msg.reply(`ꕤ الأمر *${command}* غير موجود.\n✎ استخدمي *${usedPrefix}help* لرؤية قائمة الأوامر المتاحة.`)
+// ═══════════════════════════════════════
+// تنفيذ Plugins من نوع all
+// ═══════════════════════════════════════
+
+async function runAllPlugins(context) {
+
+  const plugins = (global.cmdsExecute || [])
+    .filter(plugin => plugin?.type === 'all');
+
+  await Promise.allSettled(
+    plugins.map(async plugin => {
+
+      try {
+        await plugin.fn(context);
+      } catch (error) {
+        console.error(
+          chalk.gray(
+            `[ ✿ ] خطأ في all-plugin ${plugin.key}: ${error.message}`
+          )
+        );
+      }
+
+    })
+  );
 }
 
-if (cmdData.isAdmin && !isAdmins) return furina.reply(msg.chat, mess.admin, msg)
-if (cmdData.botAdmin && !isBotAdmins) return furina.reply(msg.chat, mess.botAdmin, msg)
 
-try {
-  await furina.sendPresenceUpdate('composing', msg.chat)
-  await furina.readMessages([msg.key])
-  const user2 = await db.getUser(msg.sender)
+// ═══════════════════════════════════════
+// تنفيذ Plugins من نوع before
+// ═══════════════════════════════════════
 
-  user2.usedcommands = (user2.usedcommands || 0) + 1
-  settings.commandsejecut = (settings.commandsejecut || 0) + 1
-  user.usedTime = new Date()
-  user2.exp = (user2.exp || 0) + Math.floor(Math.random() * 100)
-  user2.name = msg.pushName
+async function runBeforePlugins(context) {
 
-  await db.updateChatUser(msg.chat, msg.sender, 'usedTime', user.usedTime)
-  await db.updateUser(msg.sender, 'exp', user2.exp)
-  await db.updateUser(msg.sender, 'name', user2.name)
-  await db.updateUser(msg.sender, 'usedcommands', user2.usedcommands)
-  await db.updateSettings(botJid, 'commandsejecut', settings.commandsejecut)
+  const plugins = (global.cmdsExecute || [])
+    .filter(plugin => plugin?.type === 'before');
 
-  user.stats[today].cmds++
-  await db.updateChatUser(msg.chat, msg.sender, 'stats', user.stats)
+  for (const plugin of plugins) {
 
-  await cmdData.run({ msg, furina, args, command, usedPrefix, text, groupMetadata, participants, isAdmins, isBotAdmins, isOwner, __dirname: global.plugins[cmdData.pluginKey]?.dirname });
-} catch (error) {
-  console.log(error)
-  return msg.reply(`${error}`)
+    try {
+
+      const result = await plugin.fn(context);
+
+      if (result) {
+        return true;
+      }
+
+    } catch (error) {
+
+      console.error(
+        chalk.gray(
+          `[ ✿ ] خطأ في before-plugin ${plugin.key}: ${error.message}`
+        )
+      );
+
+    }
+  }
+
+  return false;
 }
 
-};
+
+// ═══════════════════════════════════════
+// الإحصائيات
+// ═══════════════════════════════════════
+
+async function updateStats(msg) {
+
+  try {
+
+    const chatUser =
+      await db.getChatUser(msg.chat, msg.sender);
+
+    if (!chatUser.stats) {
+      chatUser.stats = {};
+    }
+
+    const today = new Date()
+      .toLocaleDateString('ar-EG', {
+        timeZone: 'Africa/Cairo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      })
+      .split('/')
+      .reverse()
+      .join('-');
+
+    if (!chatUser.stats[today]) {
+      chatUser.stats[today] = {
+        msgs: 0,
+        cmds: 0
+      };
+    }
+
+    chatUser.stats[today].msgs++;
+
+    await db.updateChatUser(
+      msg.chat,
+      msg.sender,
+      'stats',
+      chatUser.stats
+    );
+
+    return {
+      chatUser,
+      today
+    };
+
+  } catch {
+    return {
+      chatUser: {},
+      today: ''
+    };
+  }
+}
+
+
+// ═══════════════════════════════════════
+// تسجيل الرسائل
+// ═══════════════════════════════════════
+
+function logMessage({
+  furina,
+  msg,
+  command,
+  pushname
+}) {
+
+  try {
+
+    console.log(`
+𝄢 · • —– ٠ ✤ ٠ —– • · · • —– ٠ ✤ ٠ —– • ·✧༄
+❚ ▸ ${chalk.cyan('𝐁𝐎𝐓 ❱❱')} ${chalk.bgMagenta(
+      chalk.white.italic(
+        furina?.user?.name || 'Furina'
+      )
+    )}
+❚ ▸ ${chalk.cyan('𝐓𝐈𝐌𝐄 ❱❱')} ${chalk.black.bgWhite(
+      moment().format('DD/MM/YY HH:mm:ss')
+    )}
+❚ ${chalk.magentaBright('°o.OO.o°°o.OO.o°°o.OO.o°')}
+❚ ▸ ${chalk.green('𝐔𝐒𝐄𝐑 ❱❱')} ${chalk.white(
+      pushname || 'بدون اسم'
+    )} / ${chalk.bgMagentaBright.bold(
+      msg?.isGroup ? 'مجموعة' : 'محادثة خاصة'
+    )}
+❚ ▸ ${chalk.green('𝐂𝐎𝐌𝐌𝐀𝐍𝐃 ❱❱')} ${chalk.magentaBright(
+      command || 'لا يوجد أمر'
+    )}
+❚ ${chalk.magentaBright('°o.OO.o°°o.OO.o°')}
+❚ ▸ ${chalk.redBright('𝐓𝐘𝐏𝐄 ❱❱')} ${chalk.greenBright.bold(
+      '[سجل Furina]'
+    )}
+𝄢 · • —– ٠ ✤ ٠ —– • · · • —– ٠ ✤ ٠ —– • ·✧༄`.trim());
+
+  } catch {}
+}
+
+
+// ═══════════════════════════════════════
+// Handler
+// ═══════════════════════════════════════
+
+export default async function handler(furina, msg) {
+
+  try {
+
+    if (!msg) return;
+
+    // ─────────────────────────────────
+    // منع بعض رسائل البوت
+    // ─────────────────────────────────
+
+    if (
+      msg.fromMe &&
+      !msg.key?.participant &&
+      msg.isBot
+    ) {
+      return;
+    }
+
+    const sender = getSenderJid(msg);
+
+    const body =
+      msg.body ||
+      msg.text ||
+      '';
+
+    const from =
+      msg.key?.remoteJid ||
+      msg.chat ||
+      '';
+
+    if (!msg.chat) {
+      msg.chat = from;
+    }
+
+    // ─────────────────────────────────
+    // Bot JID
+    // ─────────────────────────────────
+
+    const botJid = getBotJid(furina);
+
+    if (!botJid) {
+      console.error(
+        chalk.red('[ ✿ ] لم أستطع معرفة JID الخاص بـ Furina.')
+      );
+      return;
+    }
+
+    // ─────────────────────────────────
+    // Database
+    // ─────────────────────────────────
+
+    let chatData = {};
+
+    try {
+      chatData =
+        await db.getChat(msg.chat);
+    } catch {
+      chatData = {};
+    }
+
+    let settings = {};
+
+    try {
+      settings =
+        await db.getSettings(botJid);
+    } catch {
+      settings = {};
+    }
+
+    // ─────────────────────────────────
+    // Owner
+    // ─────────────────────────────────
+
+    const ownerJids =
+      getOwnerJids();
+
+    const modsJids =
+      getModsJids();
+
+    const isOwner =
+      ownerJids.includes(sender);
+
+    const isROwner =
+      [
+        botJid,
+        ...(settings?.owner
+          ? [settings.owner]
+          : []),
+        ...ownerJids
+      ].includes(sender);
+
+    // ─────────────────────────────────
+    // Group
+    // ─────────────────────────────────
+
+    const {
+      groupMetadata,
+      participants,
+      isAdmins,
+      isBotAdmins
+    } = await getGroupData(furina, msg);
+
+    // ─────────────────────────────────
+    // All Plugins
+    // ─────────────────────────────────
+
+    await runAllPlugins({
+      msg,
+      furina,
+      groupMetadata,
+      participants,
+      isAdmins,
+      isBotAdmins,
+      isOwner,
+      isROwner,
+      sender,
+      __dirname
+    });
+
+    // ─────────────────────────────────
+    // Stats
+    // ─────────────────────────────────
+
+    const {
+      chatUser,
+      today
+    } = await updateStats(msg);
+
+    // ─────────────────────────────────
+    // Prefix
+    // ─────────────────────────────────
+
+    const defaultPrefix =
+      createPrefix(settings);
+
+    const custom =
+      findCustomPrefix(
+        msg.text || body || ''
+      );
+
+    const pluginPrefix =
+      custom.pluginPrefix ||
+      defaultPrefix;
+
+    const messageText =
+      msg.text ||
+      msg.body ||
+      '';
+
+    let match = null;
+
+    if (pluginPrefix instanceof RegExp) {
+
+      pluginPrefix.lastIndex = 0;
+
+      const result =
+        pluginPrefix.exec(messageText);
+
+      if (result) {
+        match = [
+          result[0],
+          result
+        ];
+      }
+
+    } else if (Array.isArray(pluginPrefix)) {
+
+      for (const prefix of pluginPrefix) {
+
+        const regex =
+          prefix instanceof RegExp
+            ? prefix
+            : new RegExp(
+                escapeRegex(prefix),
+                'i'
+              );
+
+        const result =
+          regex.exec(messageText);
+
+        if (result) {
+          match = [
+            result[0],
+            result
+          ];
+          break;
+        }
+      }
+
+    } else if (typeof pluginPrefix === 'string') {
+
+      const regex =
+        new RegExp(
+          escapeRegex(pluginPrefix),
+          'i'
+        );
+
+      const result =
+        regex.exec(messageText);
+
+      if (result) {
+        match = [
+          result[0],
+          result
+        ];
+      }
+    }
+
+    // ─────────────────────────────────
+    // Before Plugins
+    // ─────────────────────────────────
+
+    const beforeStopped =
+      await runBeforePlugins({
+        msg,
+        furina,
+        match,
+        groupMetadata,
+        participants,
+        isAdmins,
+        isBotAdmins,
+        isOwner,
+        isROwner,
+        sender,
+        __dirname
+      });
+
+    if (beforeStopped) {
+      return;
+    }
+
+    if (!match) {
+      return;
+    }
+
+    // ─────────────────────────────────
+    // Command
+    // ─────────────────────────────────
+
+    const usedPrefix =
+      match[0] || '';
+
+    const commandText =
+      messageText
+        .slice(usedPrefix.length)
+        .trim();
+
+    if (!commandText) {
+      return;
+    }
+
+    let args =
+      commandText
+        .split(/\s+/);
+
+    let command =
+      custom.customCmd ||
+      (args.shift() || '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+
+    const text =
+      args.join(' ');
+
+    if (!command) {
+      return;
+    }
+
+    // ─────────────────────────────────
+    // تسجيل الأمر
+    // ─────────────────────────────────
+
+    const primaryBot =
+      chatData?.primaryBot;
+
+    if (
+      msg.message ||
+      !primaryBot ||
+      primaryBot === botJid
+    ) {
+
+      logMessage({
+        furina,
+        msg,
+        command,
+        pushname:
+          msg.pushName ||
+          'بدون اسم'
+      });
+
+    }
+
+    // ─────────────────────────────────
+    // Self Mode
+    // ─────────────────────────────────
+
+    if (settings?.self) {
+
+      const settingOwner =
+        settings.owner;
+
+      if (
+        sender !== settingOwner &&
+        !isOwner &&
+        !modsJids.includes(sender) &&
+        sender !== botJid
+      ) {
+        return;
+      }
+    }
+
+    // ─────────────────────────────────
+    // Private Chat
+    // ─────────────────────────────────
+
+    if (
+      msg.chat &&
+      !msg.chat.endsWith('@g.us')
+    ) {
+
+      const allowedPrivate =
+        [
+          
+          'report',
+          'reporte',
+          'sug',
+          'suggest',
+          'invite',
+          'invitar',
+          'setusername',
+          'setpfp',
+          'setimage',
+          'setstatus',
+          'reload',
+          'setname',
+          'setbotname',
+          'setmenubanner',
+          'setbanner',
+          'setbotcurrency',
+          'setbotowner',
+          'setlink',
+          'setbotlink',
+          'setbotprefix',
+          'seticon'
+        ];
+
+      const settingOwner =
+        settings?.owner;
+
+      if (
+        sender !== settingOwner &&
+        !isOwner &&
+        !allowedPrivate.includes(command)
+      ) {
+        return;
+      }
+    }
+
+    // ─────────────────────────────────
+    // Group Ban
+    // ─────────────────────────────────
+
+    const bannedCommands = [
+      '#bot on',
+      '/bot on',
+      '.bot on',
+      '!bot on',
+      '-bot on',
+      '+bot on',
+      'bot on'
+    ];
+
+    if (
+      chatData?.bannedGrupo &&
+      !bannedCommands.includes(
+        body.toLowerCase()
+      ) &&
+      !isOwner
+    ) {
+      return;
+    }
+
+    // ─────────────────────────────────
+    // Admin Only
+    // ─────────────────────────────────
+
+    if (
+      chatData?.adminonly &&
+      !isAdmins
+    ) {
+      return;
+    }
+
+    // ─────────────────────────────────
+    // تجاهل بعض الرسائل
+    // ─────────────────────────────────
+
+    if (
+      msg.id?.startsWith('3EB0') ||
+      (
+        msg.id?.startsWith('BAE5') &&
+        msg.id?.length === 16
+      ) ||
+      (
+        msg.id?.startsWith('B24E') &&
+        msg.id?.length === 20
+      )
+    ) {
+      return;
+    }
+
+    // ─────────────────────────────────
+    // الحصول على الأمر
+    // ─────────────────────────────────
+
+    if (!(global.comandos instanceof Map)) {
+      global.comandos = new Map();
+    }
+
+    const cmdData =
+      global.comandos.get(command);
+
+    // ─────────────────────────────────
+    // أمر غير موجود
+    // ─────────────────────────────────
+
+    if (!cmdData) {
+
+      if (settings?.prefijo === 1) {
+        return;
+      }
+
+      try {
+        await furina.readMessages([
+          msg.key
+        ]);
+      } catch {}
+
+      if (typeof msg.reply === 'function') {
+
+        return msg.reply(
+          `ꕤ الأمر *${command}* غير موجود.\n` +
+          `✎ استخدمي *${usedPrefix}help* ` +
+          `لرؤية قائمة الأوامر المتاحة.`
+        );
+      }
+
+      return;
+    }
+
+    // ─────────────────────────────────
+    // Owner Command
+    // ─────────────────────────────────
+
+    if (
+      cmdData.isOwner &&
+      !isOwner &&
+      sender !== botJid
+    ) {
+
+      return msg.reply(
+        `ꕤ الأمر *${command}* غير موجود.\n` +
+        `✎ استخدمي *${usedPrefix}help* ` +
+        `لرؤية قائمة الأوامر المتاحة.`
+      );
+    }
+
+    // ─────────────────────────────────
+    // Admin Command
+    // ─────────────────────────────────
+
+    if (
+      cmdData.isAdmin &&
+      !isAdmins
+    ) {
+
+      if (typeof msg.reply === 'function') {
+
+        return msg.reply(
+          '٩ʕ◕౪◕ʔو هذا الأمر يمكن تنفيذه فقط بواسطة مشرفي المجموعة.'
+        );
+
+      }
+
+      return;
+    }
+
+    // ─────────────────────────────────
+    // Bot Admin Command
+    // ─────────────────────────────────
+
+    if (
+      cmdData.botAdmin &&
+      !isBotAdmins
+    ) {
+
+      if (typeof msg.reply === 'function') {
+
+        return msg.reply(
+          '(𓂂꜆◕⩊◕꜀𓂂) هذا الأمر يمكن تنفيذه فقط إذا كان Furina مشرفًا في المجموعة.'
+        );
+
+      }
+
+      return;
+    }
+
+    // ─────────────────────────────────
+    // تنفيذ الأمر
+    // ─────────────────────────────────
+
+    try {
+
+      try {
+        await furina.sendPresenceUpdate(
+          'composing',
+          msg.chat
+        );
+      } catch {}
+
+      try {
+        await furina.readMessages([
+          msg.key
+        ]);
+      } catch {}
+
+      // User DB
+      let user2 = {};
+
+      try {
+        user2 =
+          await db.getUser(msg.sender);
+      } catch {
+        user2 = {};
+      }
+
+      user2.usedcommands =
+        (user2.usedcommands || 0) + 1;
+
+      settings.commandsejecut =
+        (settings.commandsejecut || 0) + 1;
+
+      const usedTime =
+        new Date();
+
+      user2.exp =
+        (user2.exp || 0) +
+        Math.floor(
+          Math.random() * 100
+        );
+
+      user2.name =
+        msg.pushName ||
+        'بدون اسم';
+
+      // DB Updates
+
+      try {
+        await db.updateChatUser(
+          msg.chat,
+          msg.sender,
+          'usedTime',
+          usedTime
+        );
+      } catch {}
+
+      try {
+        await db.updateUser(
+          msg.sender,
+          'exp',
+          user2.exp
+        );
+
+        await db.updateUser(
+          msg.sender,
+          'name',
+          user2.name
+        );
+
+        await db.updateUser(
+          msg.sender,
+          'usedcommands',
+          user2.usedcommands
+        );
+      } catch {}
+
+      try {
+        await db.updateSettings(
+          botJid,
+          'commandsejecut',
+          settings.commandsejecut
+        );
+      } catch {}
+
+      // Command statistics
+
+      if (
+        chatUser &&
+        today
+      ) {
+
+        if (!chatUser.stats) {
+          chatUser.stats = {};
+        }
+
+        if (!chatUser.stats[today]) {
+          chatUser.stats[today] = {
+            msgs: 0,
+            cmds: 0
+          };
+        }
+
+        chatUser.stats[today].cmds++;
+
+        try {
+          await db.updateChatUser(
+            msg.chat,
+            msg.sender,
+            'stats',
+            chatUser.stats
+          );
+        } catch {}
+      }
+
+      // تشغيل الأمر
+
+      const plugin =
+        global.plugins?.[
+          cmdData.pluginKey
+        ];
+
+      await cmdData.run({
+
+        furina,
+
+        msg,
+
+        args,
+
+        command,
+
+        usedPrefix,
+
+        text,
+
+        sender,
+
+        isOwner,
+
+        isROwner,
+
+        isGroup:
+          Boolean(msg.isGroup),
+
+        isAdmin:
+          isAdmins,
+
+        isBotAdmin:
+          isBotAdmins,
+
+        groupMetadata,
+
+        participants,
+
+        __dirname,
+
+        chatData,
+
+        settings,
+
+        plugin
+
+      });
+
+    } catch (error) {
+
+      console.error(
+        chalk.red(
+          `[ ✿ ] خطأ في الأمر ${command}:`
+        )
+      );
+
+      console.error(error);
+
+      try {
+
+        if (typeof msg.reply === 'function') {
+
+          await msg.reply(
+            `✿ حدث خطأ أثناء تنفيذ الأمر:\n\n` +
+            `${error?.message || error}`
+          );
+
+        }
+
+      } catch {}
+
+    }
+
+  } catch (error) {
+
+    console.error(
+      chalk.red(
+        '[ ✿ ] خطأ في Handler Furina:'
+      )
+    );
+
+    console.error(error);
+
+  }
+
+}
