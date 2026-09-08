@@ -9,10 +9,6 @@ import { getCachedMeta, setCachedMeta } from '#serialize';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ═══════════════════════════════════════
-// Furina — نظام الأوامر
-// ═══════════════════════════════════════
-
 if (!(global.comandos instanceof Map)) {
   global.comandos = new Map();
 }
@@ -35,10 +31,6 @@ if (!Array.isArray(global.mods)) {
 
 const commandsPath = path.join(__dirname, 'cmds');
 
-
-// ═══════════════════════════════════════
-// أدوات مساعدة
-// ═══════════════════════════════════════
 
 function normalizeNumber(number) {
   return String(number || '')
@@ -110,10 +102,6 @@ function isAdminParticipant(participant, jid) {
 }
 
 
-// ═══════════════════════════════════════
-// تحميل بيانات المجموعة
-// ═══════════════════════════════════════
-
 async function getGroupData(furina, msg) {
   if (!msg?.isGroup) {
     return {
@@ -160,9 +148,6 @@ async function getGroupData(furina, msg) {
 }
 
 
-// ═══════════════════════════════════════
-// البادئة Prefix
-// ═══════════════════════════════════════
 
 function createPrefix(settings) {
   const rawBotname = settings?.namebot2 || 'Furina';
@@ -230,11 +215,6 @@ function createPrefix(settings) {
   );
 }
 
-
-// ═══════════════════════════════════════
-// Custom Prefix
-// ═══════════════════════════════════════
-
 function findCustomPrefix(text) {
   let customCmd = null;
   let pluginPrefix = null;
@@ -280,11 +260,6 @@ function findCustomPrefix(text) {
   };
 }
 
-
-// ═══════════════════════════════════════
-// تنفيذ Plugins من نوع all
-// ═══════════════════════════════════════
-
 async function runAllPlugins(context) {
 
   const plugins = (global.cmdsExecute || [])
@@ -307,10 +282,6 @@ async function runAllPlugins(context) {
   );
 }
 
-
-// ═══════════════════════════════════════
-// تنفيذ Plugins من نوع before
-// ═══════════════════════════════════════
 
 async function runBeforePlugins(context) {
 
@@ -342,9 +313,6 @@ async function runBeforePlugins(context) {
 }
 
 
-// ═══════════════════════════════════════
-// الإحصائيات
-// ═══════════════════════════════════════
 
 async function updateStats(msg) {
 
@@ -398,10 +366,6 @@ async function updateStats(msg) {
 }
 
 
-// ═══════════════════════════════════════
-// تسجيل الرسائل
-// ═══════════════════════════════════════
-
 function logMessage({
   furina,
   msg,
@@ -440,9 +404,6 @@ function logMessage({
 }
 
 
-// ═══════════════════════════════════════
-// Handler
-// ═══════════════════════════════════════
 
 export default async function handler(furina, msg) {
 
@@ -450,9 +411,6 @@ export default async function handler(furina, msg) {
 
     if (!msg) return;
 
-    // ─────────────────────────────────
-    // منع بعض رسائل البوت
-    // ─────────────────────────────────
 
     if (
       msg.fromMe &&
@@ -478,9 +436,6 @@ export default async function handler(furina, msg) {
       msg.chat = from;
     }
 
-    // ─────────────────────────────────
-    // Bot JID
-    // ─────────────────────────────────
 
     const botJid = getBotJid(furina);
 
@@ -491,9 +446,6 @@ export default async function handler(furina, msg) {
       return;
     }
 
-    // ─────────────────────────────────
-    // Database
-    // ─────────────────────────────────
 
     let chatData = {};
 
@@ -513,9 +465,6 @@ export default async function handler(furina, msg) {
       settings = {};
     }
 
-    // ─────────────────────────────────
-    // Owner
-    // ─────────────────────────────────
 
     const ownerJids =
       getOwnerJids();
@@ -535,20 +484,12 @@ export default async function handler(furina, msg) {
         ...ownerJids
       ].includes(sender);
 
-    // ─────────────────────────────────
-    // Group
-    // ─────────────────────────────────
-
     const {
       groupMetadata,
       participants,
       isAdmins,
       isBotAdmins
     } = await getGroupData(furina, msg);
-
-    // ─────────────────────────────────
-    // All Plugins
-    // ─────────────────────────────────
 
     await runAllPlugins({
       msg,
@@ -563,18 +504,10 @@ export default async function handler(furina, msg) {
       __dirname
     });
 
-    // ─────────────────────────────────
-    // Stats
-    // ─────────────────────────────────
-
     const {
       chatUser,
       today
     } = await updateStats(msg);
-
-    // ─────────────────────────────────
-    // Prefix
-    // ─────────────────────────────────
 
     const defaultPrefix =
       createPrefix(settings);
@@ -652,10 +585,6 @@ export default async function handler(furina, msg) {
       }
     }
 
-    // ─────────────────────────────────
-    // Before Plugins
-    // ─────────────────────────────────
-
     const beforeStopped =
       await runBeforePlugins({
         msg,
@@ -678,11 +607,6 @@ export default async function handler(furina, msg) {
     if (!match) {
       return;
     }
-
-    // ─────────────────────────────────
-    // Command
-    // ─────────────────────────────────
-
     const usedPrefix =
       match[0] || '';
 
@@ -713,10 +637,6 @@ export default async function handler(furina, msg) {
       return;
     }
 
-    // ─────────────────────────────────
-    // تسجيل الأمر
-    // ─────────────────────────────────
-
     const primaryBot =
       chatData?.primaryBot;
 
@@ -737,10 +657,6 @@ export default async function handler(furina, msg) {
 
     }
 
-    // ─────────────────────────────────
-    // Self Mode
-    // ─────────────────────────────────
-
     if (settings?.self) {
 
       const settingOwner =
@@ -755,10 +671,6 @@ export default async function handler(furina, msg) {
         return;
       }
     }
-
-    // ─────────────────────────────────
-    // Private Chat
-    // ─────────────────────────────────
 
     if (
       msg.chat &&
@@ -803,9 +715,6 @@ export default async function handler(furina, msg) {
       }
     }
 
-    // ─────────────────────────────────
-    // Group Ban
-    // ─────────────────────────────────
 
     const bannedCommands = [
       '#bot on',
@@ -827,20 +736,12 @@ export default async function handler(furina, msg) {
       return;
     }
 
-    // ─────────────────────────────────
-    // Admin Only
-    // ─────────────────────────────────
-
     if (
       chatData?.adminonly &&
       !isAdmins
     ) {
       return;
     }
-
-    // ─────────────────────────────────
-    // تجاهل بعض الرسائل
-    // ─────────────────────────────────
 
     if (
       msg.id?.startsWith('3EB0') ||
@@ -856,9 +757,6 @@ export default async function handler(furina, msg) {
       return;
     }
 
-    // ─────────────────────────────────
-    // الحصول على الأمر
-    // ─────────────────────────────────
 
     if (!(global.comandos instanceof Map)) {
       global.comandos = new Map();
@@ -866,10 +764,6 @@ export default async function handler(furina, msg) {
 
     const cmdData =
       global.comandos.get(command);
-
-    // ─────────────────────────────────
-    // أمر غير موجود
-    // ─────────────────────────────────
 
     if (!cmdData) {
 
@@ -895,9 +789,6 @@ export default async function handler(furina, msg) {
       return;
     }
 
-    // ─────────────────────────────────
-    // Owner Command
-    // ─────────────────────────────────
 
     if (
       cmdData.isOwner &&
@@ -911,10 +802,7 @@ export default async function handler(furina, msg) {
         `لرؤية قائمة الأوامر المتاحة.`
       );
     }
-
-    // ─────────────────────────────────
-    // Admin Command
-    // ─────────────────────────────────
+─
 
     if (
       cmdData.isAdmin &&
@@ -932,9 +820,6 @@ export default async function handler(furina, msg) {
       return;
     }
 
-    // ─────────────────────────────────
-    // Bot Admin Command
-    // ─────────────────────────────────
 
     if (
       cmdData.botAdmin &&
@@ -952,9 +837,6 @@ export default async function handler(furina, msg) {
       return;
     }
 
-    // ─────────────────────────────────
-    // تنفيذ الأمر
-    // ─────────────────────────────────
 
     try {
 
@@ -971,7 +853,7 @@ export default async function handler(furina, msg) {
         ]);
       } catch {}
 
-      // User DB
+    
       let user2 = {};
 
       try {
@@ -999,8 +881,6 @@ export default async function handler(furina, msg) {
       user2.name =
         msg.pushName ||
         'بدون اسم';
-
-      // DB Updates
 
       try {
         await db.updateChatUser(
@@ -1039,8 +919,7 @@ export default async function handler(furina, msg) {
         );
       } catch {}
 
-      // Command statistics
-
+     
       if (
         chatUser &&
         today
@@ -1069,8 +948,7 @@ export default async function handler(furina, msg) {
         } catch {}
       }
 
-      // تشغيل الأمر
-
+    
       const plugin =
         global.plugins?.[
           cmdData.pluginKey
