@@ -1,7 +1,8 @@
-import "./settings.js";
+ 
+ import "./settings.js";
 import "#db";
 import handler from '#handler';
-import events from '#events';
+import events from './lib/events.js';
 import makeWASocket, {
   Browsers,
   makeCacheableSignalKeyStore,
@@ -17,7 +18,7 @@ import fs from "fs";
 import path from "path";
 import readlineSync from "readline-sync";
 import { smsg, getCachedMeta, setCachedMeta } from "#serialize";
-import cmdsLoader from '#cmdsloader';
+import cmdsLoader from './lib/cmdsloader.js';
 import db from '#db';
 
 const log = {
@@ -783,9 +784,7 @@ export async function startBot() {
 (async () => {
 
   await initDB();
-
   await cmdsLoader();
-
   await startBot();
 
 })();
