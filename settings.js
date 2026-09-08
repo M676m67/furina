@@ -20,7 +20,7 @@ global.mess = {
 };
 
 global.my = {
-  ch: "120363407128588763@newsletter"
+  ch: "120363399248151446@newsletter"
 };
 
 let file = fileURLToPath(import.meta.url);
