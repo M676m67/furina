@@ -1,4 +1,4 @@
-«[!NOTE]
+[!NOTE]
 This project is constantly evolving. We are committed to providing our community with an amazing Bot. We invite you to install it and stay up to date with all the latest news and updates. "Join our new channel!" (https://stellarwa.xyz/channel/hutao)»
 
 <p align="center">
