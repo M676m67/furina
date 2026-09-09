@@ -79,7 +79,7 @@ export default {
     try {
       if (!args[0]) {
         return msg.reply(
-          '✰🧁│ ضعي اسم الملف\nمثال: .ph owner/test'
+          '*۫⌁ حـطـي اسـم الـكـود › ◡ ‹*'
         )
       }
 
@@ -87,16 +87,16 @@ export default {
 
       if (!quotedText) {
         return msg.reply(
-          'اعـمـلـي ربـلاي ع الـكـود الـي عـايـزه تـضـيـفـيـه'
+          '`/`/`/Reply to the code ›..‹`/`/`/'
         )
       }
 
       quotedText = cleanCode(quotedText)
 
-      if (!quotedText) {
-        return msg.reply(
-          ' مـا قـدرت اسـتـخـرج الـكـود مـن الـربـلاي'
-        )
+if (!quotedText) {
+  return msg.reply(
+    'Sorry, I couldn\'t see the code.'
+  )
       }
 
       let file = args[0]
@@ -185,8 +185,7 @@ END:VCARD`
       await furina.sendMessage(
         msg.chat,
         {
-          text: `⌯ تـم فـحـص الـكـود وحـفـظـه بـنـجـاح:
-${filePath}`
+          text: `⌁ ${filePath}`
         },
         {
           quoted: fake
