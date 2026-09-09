@@ -10,13 +10,13 @@ global.api = {
   key: 'proyectsV2'
 };
 
-global.msgglobal = '✿⸝꙳.˖ حدثت مشكلة، يرجى التواصل مع المطور';
-global.dev = `★彡[xɪ_ᴍɪɢᴜᴇʟᴏɴ77xx]彡★`;
+global.msgglobal = 'Error in Forina Bot ( › ◡ ‹ )';
+global.dev = `𝙱𝚈: 𝙺𝙰𝙽𝙰𝙾^᪲᪲`;
 
 global.mess = {
-  admin: '٩ʕ◕౪◕ʔو هذا الأمر يمكن تنفيذه فقط بواسطة مشرفي المجموعة.',
-  botAdmin: '(𓂂꜆◕⩊◕꜀𓂂) هذا الأمر يمكن تنفيذه فقط إذا كان Furina مشرفًا في المجموعة.',
-  comandooff: 'ღゝ◡╹ )ノ هذه الأوامر معطلة في هذه المجموعة.'
+  admin: '⌁ الامـر ده لـلادمــن ببس › ◡ ‹ ',
+  botAdmin: '.',
+  comandooff: '⌁ الامـر ده مـش شـغـال هـنـا يـاروحـي › ◡ ‹ '
 };
 
 global.my = {
