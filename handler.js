@@ -273,7 +273,7 @@ async function runAllPlugins(context) {
       } catch (error) {
         console.error(
           chalk.gray(
-            `[ ✿ ] خطأ في all-plugin ${plugin.key}: ${error.message}`
+            `[ ✿ ] Error in all-plugin ${plugin.key}: ${error.message}`
           )
         );
       }
@@ -302,7 +302,7 @@ async function runBeforePlugins(context) {
 
       console.error(
         chalk.gray(
-          `[ ✿ ] خطأ في before-plugin ${plugin.key}: ${error.message}`
+          `[ ✿ ] Error in before-plugin ${plugin.key}: ${error.message}`
         )
       );
 
@@ -387,16 +387,16 @@ function logMessage({
     )}
 ❚ ${chalk.magentaBright('°o.OO.o°°o.OO.o°°o.OO.o°')}
 ❚ ▸ ${chalk.green('𝐔𝐒𝐄𝐑 ❱❱')} ${chalk.white(
-      pushname || 'بدون اسم'
+      pushname || 'No name'
     )} / ${chalk.bgMagentaBright.bold(
-      msg?.isGroup ? 'مجموعة' : 'محادثة خاصة'
+      msg?.isGroup ? 'Group' : 'Private chat'
     )}
 ❚ ▸ ${chalk.green('𝐂𝐎𝐌𝐌𝐀𝐍𝐃 ❱❱')} ${chalk.magentaBright(
-      command || 'لا يوجد أمر'
+      command || 'No command'
     )}
 ❚ ${chalk.magentaBright('°o.OO.o°°o.OO.o°')}
 ❚ ▸ ${chalk.redBright('𝐓𝐘𝐏𝐄 ❱❱')} ${chalk.greenBright.bold(
-      '[سجل Furina]'
+      '[Furina Log]'
     )}
 𝄢 · • —– ٠ ✤ ٠ —– • · · • —– ٠ ✤ ٠ —– • ·✧༄`.trim());
 
@@ -441,7 +441,7 @@ export default async function handler(furina, msg) {
 
     if (!botJid) {
       console.error(
-        chalk.red('[ ✿ ] لم أستطع معرفة JID الخاص بـ Furina.')
+        chalk.red('[ ✿ ] I could not determine Furina\'s JID.')
       );
       return;
     }
@@ -652,7 +652,7 @@ export default async function handler(furina, msg) {
         command,
         pushname:
           msg.pushName ||
-          'بدون اسم'
+          'No name'
       });
 
     }
@@ -812,7 +812,7 @@ export default async function handler(furina, msg) {
       if (typeof msg.reply === 'function') {
 
         return msg.reply(
-          '٩ʕ◕౪◕ʔو هذا الأمر يمكن تنفيذه فقط بواسطة مشرفي المجموعة.'
+          '٩ʕ◕౪◕ʔو this command can only be executed by group administrators.'
         );
 
       }
@@ -829,7 +829,7 @@ export default async function handler(furina, msg) {
       if (typeof msg.reply === 'function') {
 
         return msg.reply(
-          '(𓂂꜆◕⩊◕꜀𓂂) هذا الأمر يمكن تنفيذه فقط إذا كان Furina مشرفًا في المجموعة.'
+          '(𓂂꜆◕⩊◕꜀𓂂) this command can only be executed if Furina is a group administrator.'
         );
 
       }
@@ -880,7 +880,7 @@ export default async function handler(furina, msg) {
 
       user2.name =
         msg.pushName ||
-        'بدون اسم';
+        'No name';
 
       try {
         await db.updateChatUser(
@@ -1001,7 +1001,7 @@ export default async function handler(furina, msg) {
 
       console.error(
         chalk.red(
-          `[ ✿ ] خطأ في الأمر ${command}:`
+          `[ ✿ ] Error in command ${command}:`
         )
       );
 
@@ -1012,7 +1012,7 @@ export default async function handler(furina, msg) {
         if (typeof msg.reply === 'function') {
 
           await msg.reply(
-            `✿ حدث خطأ أثناء تنفيذ الأمر:\n\n` +
+            `✿ An error occurred while executing the command:\n\n` +
             `${error?.message || error}`
           );
 
@@ -1026,7 +1026,7 @@ export default async function handler(furina, msg) {
 
     console.error(
       chalk.red(
-        '[ ✿ ] خطأ في Handler Furina:'
+        '[ ✿ ] Error in Furina Handler:'
       )
     );
 
