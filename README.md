@@ -1,6 +1,5 @@
 > [!NOTE]
-This project is constantly evolving. We are committed to providing our community with an amazing Bot. We invite you to install it and stay up to date with all the latest news and updates. "Join our new channel!" (https://stellarwa.xyz/channel/hutao)»
-
+Este proyecto está en constante evolución. Estamos comprometidos en ofrecer a nuestra comunidad un Bot increíble. Te invitamos a instalarlo y para estar al tanto de todas las novedades. ¡Únete a nuestro nuevo canal!
 <p align="center">
 <img src="https://files.catbox.moe/n46cln.png" alt="Furina" style="width: 75%; height: auto; max-width: 100px;"><p align="center">
 <a href="#"><img title="Furina" src="https://img.shields.io/badge/Enjoy a completely free Bot with multiple features and open source code!-purple?colorA=%239b33b0&colorB=%231c007b&style=for-the-badge"></a>
