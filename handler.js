@@ -780,9 +780,8 @@ export default async function handler(furina, msg) {
       if (typeof msg.reply === 'function') {
 
         return msg.reply(
-          `ꕤ الأمر *${command}* غير موجود.\n` +
-          `✎ استخدمي *${usedPrefix}help* ` +
-          `لرؤية قائمة الأوامر المتاحة.`
+          `⌁ هـاذا الأمـر *${command}* غـيـر مـوجـود
+ اكـتـبـي .اوامـر لـعـرض الأوامـر الـمـتـاحـه.  › ◡ ‹`
         );
       }
 
@@ -797,12 +796,9 @@ export default async function handler(furina, msg) {
     ) {
 
       return msg.reply(
-        `ꕤ الأمر *${command}* غير موجود.\n` +
-        `✎ استخدمي *${usedPrefix}help* ` +
-        `لرؤية قائمة الأوامر المتاحة.`
+        `الامـر ده لـلـمـطـوره بـس ( › ◡ ‹ ).`
       );
     }
-─
 
     if (
       cmdData.isAdmin &&
@@ -812,7 +808,7 @@ export default async function handler(furina, msg) {
       if (typeof msg.reply === 'function') {
 
         return msg.reply(
-          '٩ʕ◕౪◕ʔو this command can only be executed by group administrators.'
+          '⌁ الامـر ده لـلادمــن بـس ( › ◡ ‹ )'
         );
 
       }
@@ -829,7 +825,7 @@ export default async function handler(furina, msg) {
       if (typeof msg.reply === 'function') {
 
         return msg.reply(
-          '(𓂂꜆◕⩊◕꜀𓂂) this command can only be executed if Furina is a group administrator.'
+          '⌁ لـازم اكــون ادمــن يـاروحـي!!'
         );
 
       }
