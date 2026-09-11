@@ -1,15 +1,14 @@
-import db from "#db"
 import cp from 'child_process'
 import { promisify } from 'util'
 const exec = promisify(cp.exec)
-
 export default {
   command: ['r'],
   isOwner: false,
   run: async ({ msg, furina, args }) => {
     const cmd = args.join(' ').trim()
     if (!cmd) {
-      return 
+      return
+    }
     let result
     try {
       result = await exec(cmd)
